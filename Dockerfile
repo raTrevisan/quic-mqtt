@@ -23,7 +23,7 @@ RUN cd pynng-mqtt && git submodule update --init --recursive
 RUN apt install python3-dev -y
 RUN apt-get install python3-pip -y
 COPY ./init.sh ./init.sh
-#RUN sed 's/\r//g' ./init.sh > ./init.sh
-#RUN ./init.sh
-#WORKDIR /pynng-mqtt/examples
-#ENTRYPOINT ["python3", "pynng-mqtt/examples/mqtt_quic_sub.py", "topic", "1"]
+RUN sed 's/\r//g' ./init.sh > ./init.sh
+RUN ./init.sh
+WORKDIR /pynng-mqtt/examples
+ENTRYPOINT ["python3", "pynng-mqtt/examples/mqtt_quic_sub.py", "topic", "1"]
