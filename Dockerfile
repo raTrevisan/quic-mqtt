@@ -22,8 +22,16 @@ RUN git clone https://github.com/wanghaEMQ/pynng-mqtt.git
 RUN cd pynng-mqtt && git submodule update --init --recursive
 RUN apt install python3-dev -y
 RUN apt-get install python3-pip -y
-COPY ./init.sh ./init.sh
-RUN sed 's/\r//g' ./init.sh > ./init.sh
-RUN ./init.sh
+COPY ./pynng-mqtt/pyproject.toml ./pynng-mqtt/pyproject.toml
+WORKDIR /pynng-mqtt/nng/extern/msquic
+RUN mkdir -p build
+WORKDIR /pynng-mqtt/nng/extern/msquic/build
+RUN cmake ..
+RUN make -j8
+RUN make install
+WORKDIR /pynng-mqtt
+RUN pip3 install --user asyncio 
+RUN pip3 install .
+RUN ldconfig
 WORKDIR /pynng-mqtt/examples
-ENTRYPOINT ["python3", "pynng-mqtt/examples/mqtt_quic_sub.py", "topic", "1"]
+ENTRYPOINT ["python3", "mqtt_quic_sub.py", "topic", "1"]

@@ -1,0 +1,10 @@
+version: "3.7"
+services:
+  manager:
+    image: opendigitaltwin/manager
+    environment:
+      - CLUSTER_IP=emqx.dtwins
+      - CLUSTER_PORT='18083'
+      - MQTT_SUBSCRIBED_TOPIC='sometopic'
+      - MQTT_QOS=0
+    restart: always
