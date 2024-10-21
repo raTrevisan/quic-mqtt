@@ -22,16 +22,20 @@ mqtt_qos = os.getenv("MQTT_QOS")
 mqtt_secrets = os.getenv("MQTT_SECRETS")
 
 
-def build_conn_message(CONN, mqtt_secrets):
+def build_conn_message(mqtt_secrets):
+  print("Building connection Message ")
   connmsg = pynng.Mqttmsg()
   connmsg.set_packet_type(CONN) #Set a connect message to the mqtt broker
   connmsg.set_connect_proto_version(4) #Set protocol version to MQTT version 3.11
-  connmsg.set_connect_username(mqtt_secrets)
-  connmsg.set_connect_username(mqtt_secrets) #TODO set kubenrnetes secrets for mqtt
+  connmsg.set_connect_username("admin") #TODO set kubenrnetes secrets for mqtt
+  connmsg.set_connect_password("public")
+  connmsg.set_connect_keep_alive(60)
+  connmsg.set_connect_clean_session(True)
   return connmsg
 
 
-def build_sub_message(SUB, mqtt_topic, ):
+def build_sub_message(mqtt_topic, mqtt_qos):
+  print("Building subscribe Message ")
   submsg = pynng.Mqttmsg()
   submsg.set_packet_type(SUB) #Set a pub message to the mqtt broker
   submsg.set_subscribe_topic(mqtt_topic, len(mqtt_topic), int(mqtt_qos), 0, 0, 0)
@@ -40,17 +44,16 @@ def build_sub_message(SUB, mqtt_topic, ):
 
 async def main():
   address = (mqtt_cluster_ip + ":" + mqtt_cluster_port) # build address:port
-  build_conn_message(address, CONN, mqtt_secrets)
+  print("Connecting to : " + address)
 
   with pynng.Mqtt_quic(address) as mqtt:
-
-    print("Connecting to : " + address)
-    connmsg = build_conn_message(CONN, mqtt_secrets)
-    await mqtt.asend_msg(connmsg)
+    connmsg = build_conn_message(mqtt_secrets)
     print("Connect packet sent.")
+    await mqtt.asend_msg(connmsg)
 
     print("Subscribing to topic : " + mqtt_topic)
-    submsg = build_sub_message(mqtt_topic)
+    submsg = build_sub_message(mqtt_topic, mqtt_qos)
+    print("Subscribe message sent")
     await mqtt.asend_msg(submsg)
     while True:
       rmsg = await mqtt.arecv_msg()
@@ -62,11 +65,10 @@ async def main():
       print("payload:", rmsg.publish_payload(), "(", rmsg.publish_payload_sz(), ")")
 
 
-
-    
     print(f"Done.")
 
 if __name__ == "__main__":
+  print("Starting")
   try:
     asyncio.run(main())
   except pynng.exceptions.NNGException:

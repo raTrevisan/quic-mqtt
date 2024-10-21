@@ -33,5 +33,8 @@ WORKDIR /pynng-mqtt
 RUN pip3 install --user asyncio 
 RUN pip3 install .
 RUN ldconfig
-WORKDIR /pynng-mqtt/examples
-ENTRYPOINT ["python3", "mqtt_quic_sub.py", "topic", "1"]
+WORKDIR /
+COPY ./mqtt_quic_sub.py ./mqtt_quic_sub.py
+COPY ./start.sh ./start.sh 
+RUN chmod +x ./start.sh
+ENTRYPOINT ["/start.sh"]

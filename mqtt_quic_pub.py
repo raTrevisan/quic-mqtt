@@ -34,16 +34,18 @@ def build_payload(mqtt_message_size):
   return payload
 
 
-def build_conn_message(CONN, mqtt_secrets):
+def build_conn_message(mqtt_secrets):
   connmsg = pynng.Mqttmsg()
   connmsg.set_packet_type(CONN) #Set a connect message to the mqtt broker
   connmsg.set_connect_proto_version(4) #Set protocol version to MQTT version 3.11
-  connmsg.set_connect_username(mqtt_secrets)
-  connmsg.set_connect_username(mqtt_secrets) #TODO set kubenrnetes secrets for mqtt
+  connmsg.set_connect_username("admin") #TODO set kubenrnetes secrets for mqtt
+  connmsg.set_connect_password("public")
+  connmsg.set_connect_keep_alive(60)
+  connmsg.set_connect_clean_session(True)
   return connmsg
 
 
-def build_pub_message(PUB, mqtt_message_size):
+def build_pub_message(mqtt_message_size):
   pubmsg = pynng.Mqttmsg()
   pubmsg.set_packet_type(PUB) #Set a pub message to the mqtt broker
   pubmsg.set_publish_topic(mqtt_topic)
@@ -55,19 +57,19 @@ def build_pub_message(PUB, mqtt_message_size):
 
 async def main():
   address = (mqtt_cluster_ip + ":" + mqtt_cluster_port) # build address:port
-  build_conn_message(address, CONN, mqtt_secrets)
+  build_conn_message(mqtt_secrets)
 
   with pynng.Mqtt_quic(address) as mqtt:
 
     print("Connecting to : " + address)
-    connmsg = build_conn_message(CONN, mqtt_secrets)
+    connmsg = build_conn_message(mqtt_secrets)
     await mqtt.asend_msg(connmsg)
     print(f"Connect packet sent.")
 
 
 
     for i in range(mqtt_message_num): # sending 'mqtt_message_num' messages
-        pubmsg = build_pub_message(PUB, mqtt_message_size) #build a MQTT message
+        pubmsg = build_pub_message(mqtt_message_size) #build a MQTT message
         await mqtt.asend_msg(pubmsg)
         await asyncio.sleep(float(mqtt_message_freq_ms)/1000) #converting time delay to ms
     
