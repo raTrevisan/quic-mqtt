@@ -35,6 +35,7 @@ RUN pip3 install .
 RUN ldconfig
 WORKDIR /
 COPY ./mqtt_quic_sub.py ./mqtt_quic_sub.py
-COPY ./start.sh ./start.sh 
-RUN chmod +x ./start.sh
-ENTRYPOINT ["/start.sh"]
+RUN apt-get remove git --purge -y
+RUN apt remove ninja-build --purge ninja-build -y
+RUN apt remove wget --purge -y
+ENTRYPOINT ["python3", "./mqtt_quic_sub.py"]
