@@ -34,8 +34,8 @@ RUN pip3 install --user asyncio
 RUN pip3 install .
 RUN ldconfig
 WORKDIR /
-COPY ./mqtt_quic_sub.py ./mqtt_quic_sub.py
+COPY ./mqtt_quic_pub.py ./mqtt_quic_pub.py
 RUN apt-get remove git --purge -y
 RUN apt remove ninja-build --purge ninja-build -y
 RUN apt remove wget --purge -y
-ENTRYPOINT ["python3", "./mqtt_quic_sub.py"]
+ENTRYPOINT ["python3", "./mqtt_quic_pub.py"]

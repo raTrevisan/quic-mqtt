@@ -11,8 +11,13 @@ import pynng
 import os
 import asyncio
 import logging
+import datetime
 
 
+# MQTT packet type constants
+# CONN: Connection request packet type
+# PUB: Publish message packet type
+# SUB: Subscribe request packet type
 CONN = 1
 PUB = 3
 SUB = 8
@@ -24,7 +29,6 @@ mqtt_qos = os.getenv("MQTT_QOS")
 mqtt_secrets = os.getenv("MQTT_SECRETS")
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
-
 
 def build_conn_message(mqtt_secrets):
   #logging.info("Building connection Message ")
@@ -63,11 +67,12 @@ async def main():
     while True:
       rmsg = await mqtt.arecv_msg()
       rmsg.__class__ = pynng.Mqttmsg # convert to mqttmsg
-      logging.info("msg", rmsg, "arrived.")
-      logging.info("type:   ", rmsg.packet_type())
-      logging.info("qos:    ", rmsg.publish_qos())
-      logging.info("topic:  ", rmsg.publish_topic())
-      logging.info("payload:", rmsg.publish_payload(), "(", rmsg.publish_payload_sz(), ")")
+      match pynng.Mqttmsg.get_packet_type(rmsg):
+        case pynng.Mqttmsg.PUBLISH:
+          logging.info("Message received on topic: " + str(rmsg.publish_topic()) + 
+                       " with payload: " + str(rmsg.publish_payload()) + " at " + str(datetime.datetime.now()))
+        case _:
+          logging.info("Unknown packet type received")
 
 if __name__ == "__main__":
   logging.info("Starting")
