@@ -35,8 +35,9 @@ mqtt_client_id = os.getenv("POD_NAME")
 
 
 def build_payload(mqtt_message_size):
-  time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-  payload = time + ''.join(random.choice(string.ascii_uppercase + string.digits) for _ in range(mqtt_message_size)) # creates a random string thats 'mqtt_message_size' long
+  time = datetime.datetime.now()
+  payload = (''.join(random.choice(string.ascii_uppercase + string.digits) 
+                     for _ in range(mqtt_message_size)) + "#" + str(time)) # creates a random string thats 'mqtt_message_size' long
   return payload
 
 
