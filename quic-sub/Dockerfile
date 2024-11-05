@@ -22,7 +22,7 @@ RUN git clone https://github.com/wanghaEMQ/pynng-mqtt.git
 RUN cd pynng-mqtt && git submodule update --init --recursive
 RUN apt install python3-dev -y
 RUN apt-get install python3-pip -y
-COPY ../pyproject.toml ./pynng-mqtt/pyproject.toml
+COPY ./pyproject.toml ./pynng-mqtt/pyproject.toml
 WORKDIR /pynng-mqtt/nng/extern/msquic
 RUN mkdir -p build
 WORKDIR /pynng-mqtt/nng/extern/msquic/build

@@ -27,6 +27,7 @@ mqtt_cluster_port = os.getenv("MQTT_CLUSTER_PORT")
 mqtt_topic= os.getenv("MQTT_TOPIC")
 mqtt_qos = os.getenv("MQTT_QOS")
 mqtt_secrets = os.getenv("MQTT_SECRETS")
+mqtt_client_id = os.getenv("POD_NAME")
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
@@ -34,10 +35,11 @@ def build_conn_message(mqtt_secrets):
   #logging.info("Building connection Message ")
   connmsg = pynng.Mqttmsg()
   connmsg.set_packet_type(CONN) #Set a connect message to the mqtt broker
+  connmsg.set_connect_client_id(mqtt_client_id)
   connmsg.set_connect_proto_version(4) #Set protocol version to MQTT version 3.11
   connmsg.set_connect_username("admin") #TODO set kubenrnetes secrets for mqtt
   connmsg.set_connect_password("public")
-  connmsg.set_connect_keep_alive(30)
+  connmsg.set_connect_keep_alive(10)
   connmsg.set_connect_clean_session(True)
   return connmsg
 
@@ -67,18 +69,19 @@ async def main():
     while True:
       rmsg = await mqtt.arecv_msg()
       rmsg.__class__ = pynng.Mqttmsg # convert to mqttmsg
-      match pynng.Mqttmsg.get_packet_type(rmsg):
-        case pynng.Mqttmsg.PUBLISH:
-          logging.info("Message received on topic: " + str(rmsg.publish_topic()) + 
-                       " with payload: " + str(rmsg.publish_payload()) + " at " + str(datetime.datetime.now()))
-        case _:
-          logging.info("Unknown packet type received")
+      if rmsg.packet_type() == 3:
+        logging.info("Message received on topic: " + str(rmsg.publish_topic()) + 
+                     " with payload size: " + str(len(rmsg.publish_payload())) + 
+                       " at " + str(datetime.datetime.now()))
+      else:
+        logging.info("Unhandled packet type received")
 
 if __name__ == "__main__":
-  logging.info("Starting")
+  logging.info("Starting Version 1.0.1")
   try:
     asyncio.run(main())
   except pynng.exceptions.NNGException:
     logging.info("Connection closed")
   except KeyboardInterrupt:   # that's the way the program *should* end
     exit(0)
+  
