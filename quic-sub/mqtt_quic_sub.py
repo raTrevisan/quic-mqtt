@@ -72,12 +72,12 @@ async def main():
       if rmsg.packet_type() == 3:
         logging.info("Message received on topic: " + str(rmsg.publish_topic()) + 
                      " with payload size: " + str(len(rmsg.publish_payload())) + 
-                       " at " + str(datetime.datetime.now()))
+                     " at " + str(datetime.datetime.now()) + " sent " + str(rmsg.publish_payload()).split("#")[1])
       else:
         logging.info("Unhandled packet type received")
 
 if __name__ == "__main__":
-  logging.info("Starting Version 1.0.1")
+  logging.info("Starting Version 1.0.2")
   try:
     asyncio.run(main())
   except pynng.exceptions.NNGException:

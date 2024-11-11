@@ -1,4 +1,4 @@
-FROM debian:10
+FROM debian:latest
 RUN su
 RUN apt update
 RUN apt-get install software-properties-common -y
@@ -9,7 +9,7 @@ RUN apt-get install git -y
 RUN apt install ninja-build -y
 RUN apt install wget -y
 RUN apt install libffi-dev -y
-RUN apt install libmbedtls-dev libmbedtls12 -y
+RUN apt install libmbedtls-dev -y
 RUN mkdir build
 WORKDIR /build
 RUN wget https://github.com/Kitware/CMake/releases/download/v3.30.4/cmake-3.30.4.tar.gz
@@ -30,8 +30,8 @@ RUN cmake ..
 RUN make -j8
 RUN make install
 WORKDIR /pynng-mqtt
-RUN pip3 install --user asyncio 
-RUN pip3 install .
+RUN pip3 install --user asyncio --break-system-packages
+RUN pip3 install . --break-system-packages
 RUN ldconfig
 WORKDIR /
 COPY ./mqtt_quic_sub.py ./mqtt_quic_sub.py
