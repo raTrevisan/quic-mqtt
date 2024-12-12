@@ -7,7 +7,7 @@ MQTT_SECRETS => kubernetes secret Username and password
 """
 
 
-import pynng
+import pynng # type: ignore
 import os
 import asyncio
 import logging
@@ -28,6 +28,7 @@ mqtt_topic= os.getenv("MQTT_TOPIC")
 mqtt_qos = os.getenv("MQTT_QOS")
 mqtt_secrets = os.getenv("MQTT_SECRETS")
 mqtt_client_id = os.getenv("POD_NAME")
+log_interval = int(os.getenv("LOG_INTERVAL"))
 
 logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
@@ -43,18 +44,23 @@ def build_conn_message(mqtt_secrets):
   connmsg.set_connect_clean_session(True)
   return connmsg
 
+def build_topic(mqtt_topic, mqtt_client_id):
+  client_number = mqtt_client_id.split("-")[5]
+  topic = mqtt_topic + "/" +client_number
+  return topic
 
-def build_sub_message(mqtt_topic, mqtt_qos):
+def build_sub_message(topic, mqtt_qos):
   #logging.info("Building subscribe Message ")
   submsg = pynng.Mqttmsg()
   submsg.set_packet_type(SUB) #Set a pub message to the mqtt broker
-  submsg.set_subscribe_topic(mqtt_topic, len(mqtt_topic), int(mqtt_qos), 0, 0, 0)
+  submsg.set_subscribe_topic(topic, len(topic), int(mqtt_qos), 0, 0, 0)
   return submsg
 
 
 async def main():
   address = ("mqtt-quic://" + mqtt_cluster_ip + ":" + mqtt_cluster_port) # build address:port
-  logging.info("Connecting to cluster at: " + address)
+  logging.info("Connecting to cluster at: " + address + " using QUIC")
+  topic = build_topic(mqtt_topic, mqtt_client_id)
 
   with pynng.Mqtt_quic(address) as mqtt:
     connmsg = build_conn_message(mqtt_secrets)
@@ -62,22 +68,28 @@ async def main():
     #logging.info("Connect packet sent.")
 
     #logging.info("Subscribing to topic : " + mqtt_topic)
-    submsg = build_sub_message(mqtt_topic, mqtt_qos)
+    submsg = build_sub_message(topic, mqtt_qos)
     #logging.info("Subscribe message sent")
     await mqtt.asend_msg(submsg)
-    logging.info("Subscribed to topic: " + mqtt_topic)
+    logging.info("Subscribed to topic: " + topic)
+    logging.info("Logging each: " + str(log_interval))
+    i = 0
     while True:
       rmsg = await mqtt.arecv_msg()
       rmsg.__class__ = pynng.Mqttmsg # convert to mqttmsg
       if rmsg.packet_type() == 3:
-        logging.info("Message received on topic: " + str(rmsg.publish_topic()) + 
-                     " with payload size: " + str(len(rmsg.publish_payload())) + 
-                     " at " + str(datetime.datetime.now()) + " sent " + str(rmsg.publish_payload()).split("#")[1])
+        if i == log_interval :
+          logging.info("Message received on topic: " + str(rmsg.publish_topic()) + 
+                      " with payload size: " + str(len(rmsg.publish_payload())) + 
+                      " at " + str(datetime.datetime.now()) + " sent " + str(rmsg.publish_payload()).split("#")[1])
+          i = 0
+        else:
+          i += 1
       else:
         logging.info("Unhandled packet type received")
 
 if __name__ == "__main__":
-  logging.info("Starting Version 1.0.2")
+  logging.info("Starting Version 1.0.5")
   try:
     asyncio.run(main())
   except pynng.exceptions.NNGException:
