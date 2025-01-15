@@ -1,99 +1,99 @@
-"""
-MQTT_CLUSTER_IP => String, IP address of the MQTT broker
-MQTT_CLUSTER_PORT => Int, port of the MQTT broker, quic default is 14567
-MQTT_TOPIC => String topic in which messages will be sent. Can have multiple levels and use wildcards (+, #)
-MQTT_QOS => [0,1,2], MQTT Quality of service
-MQTT_SECRETS => kubernetes secret Username and password
-"""
-
-
-import pynng # type: ignore
+import pynng
 import os
 import asyncio
 import logging
 import datetime
 
+logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
-# MQTT packet type constants
-# CONN: Connection request packet type
-# PUB: Publish message packet type
-# SUB: Subscribe request packet type
 CONN = 1
 PUB = 3
 SUB = 8
 
+delay = int(os.getenv("CONTAINER_DELAY_S"))
 mqtt_cluster_ip = os.getenv("MQTT_CLUSTER_IP")
 mqtt_cluster_port = os.getenv("MQTT_CLUSTER_PORT")
-mqtt_topic= os.getenv("MQTT_TOPIC")
-mqtt_qos = os.getenv("MQTT_QOS")
+mqtt_topic = os.getenv("MQTT_TOPIC")
+mqtt_qos = int(os.getenv("MQTT_QOS"))
 mqtt_secrets = os.getenv("MQTT_SECRETS")
 mqtt_client_id = os.getenv("POD_NAME")
-log_interval = int(os.getenv("LOG_INTERVAL"))
-
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.DEBUG)
 
 def build_conn_message(mqtt_secrets):
-  #logging.info("Building connection Message ")
-  connmsg = pynng.Mqttmsg()
-  connmsg.set_packet_type(CONN) #Set a connect message to the mqtt broker
-  connmsg.set_connect_client_id(mqtt_client_id)
-  connmsg.set_connect_proto_version(4) #Set protocol version to MQTT version 3.11
-  connmsg.set_connect_username("admin") #TODO set kubenrnetes secrets for mqtt
-  connmsg.set_connect_password("public")
-  connmsg.set_connect_keep_alive(10)
-  connmsg.set_connect_clean_session(True)
-  return connmsg
+    connmsg = pynng.Mqttmsg()
+    connmsg.set_packet_type(CONN)  # Set a connect message to the mqtt broker
+    connmsg.set_connect_proto_version(4)  # Set protocol version to MQTT version 3.11
+    connmsg.set_connect_client_id(mqtt_client_id)
+    connmsg.set_connect_username("admin")  # TODO: set Kubernetes secrets for mqtt
+    connmsg.set_connect_password("public")
+    connmsg.set_connect_keep_alive(60)
+    connmsg.set_connect_clean_session(True)
+    return connmsg
 
-def build_topic(mqtt_topic, mqtt_client_id):
-  client_number = mqtt_client_id.split("-")[5]
-  topic = mqtt_topic + "/" +client_number
-  return topic
-
-def build_sub_message(topic, mqtt_qos):
-  #logging.info("Building subscribe Message ")
-  submsg = pynng.Mqttmsg()
-  submsg.set_packet_type(SUB) #Set a pub message to the mqtt broker
-  submsg.set_subscribe_topic(topic, len(topic), int(mqtt_qos), 0, 0, 0)
-  return submsg
-
+def build_sub_message(sub_topic, mqtt_qos):
+    submsg = pynng.Mqttmsg()
+    submsg.set_packet_type(SUB)  # Set a subscribe message to the mqtt broker
+    submsg.set_subscribe_topic(sub_topic, len(sub_topic), int(mqtt_qos), 0, 0, 0)
+    return submsg
 
 async def main():
-  address = ("mqtt-quic://" + mqtt_cluster_ip + ":" + mqtt_cluster_port) # build address:port
-  logging.info("Connecting to cluster at: " + address + " using QUIC")
-  topic = build_topic(mqtt_topic, mqtt_client_id)
+    logging.info(mqtt_client_id)
+    logging.info("waiting for: " + str(delay * int(mqtt_client_id.split("-")[5])))
+    await asyncio.sleep(delay * int(mqtt_client_id.split("-")[5]))
 
-  with pynng.Mqtt_quic(address) as mqtt:
-    connmsg = build_conn_message(mqtt_secrets)
-    await mqtt.asend_msg(connmsg)
-    #logging.info("Connect packet sent.")
+    address = ("mqtt-quic://" + mqtt_cluster_ip + ":" + mqtt_cluster_port)  # build address:port
+    topic = mqtt_topic  # Assuming you have a way to build the topic
 
-    #logging.info("Subscribing to topic : " + mqtt_topic)
-    submsg = build_sub_message(topic, mqtt_qos)
-    #logging.info("Subscribe message sent")
-    await mqtt.asend_msg(submsg)
-    logging.info("Subscribed to topic: " + topic)
-    logging.info("Logging each: " + str(log_interval))
-    i = 0
     while True:
-      rmsg = await mqtt.arecv_msg()
-      rmsg.__class__ = pynng.Mqttmsg # convert to mqttmsg
-      if rmsg.packet_type() == 3:
-        if i == log_interval :
-          logging.info("Message received on topic: " + str(rmsg.publish_topic()) + 
-                      " with payload size: " + str(len(rmsg.publish_payload())) + 
-                      " at " + str(datetime.datetime.now()) + " sent " + str(rmsg.publish_payload()).split("#")[1])
-          i = 0
-        else:
-          i += 1
-      else:
-        logging.info("Unhandled packet type received")
+        try:
+            with pynng.Mqtt_quic(address) as mqtt:
+                logging.info("Connecting to: " + address + " with topic: " + topic)
+                connmsg = build_conn_message(mqtt_secrets)
+                await mqtt.asend_msg(connmsg)
+
+                # Subscribe to the topic
+                submsg = build_sub_message(topic, mqtt_qos)
+                await mqtt.asend_msg(submsg)
+                logging.info(f"Subscribed to topic: {topic}")
+
+                while True:
+                    rmsg = await mqtt.arecv_msg()
+                    rmsg.__class__ = pynng.Mqttmsg  # Convert to mqttmsg
+                    if rmsg.packet_type() == PUB:
+                        logging.info("Message received on topic: " + str(rmsg.publish_topic()) +
+                                     " with payload size: " + str(len(rmsg.publish_payload())) +
+                                     " at " + str(datetime.datetime.now()) +
+                                     " sent " + str(rmsg.publish_payload()).split("#")[1])
+                    else:
+                        logging.info("Unhandled packet type received")
+
+        except pynng.exceptions.NNGException as e:
+            logging.error(f"Connection error: {e}. Attempting to reconnect...")
+            await asyncio.sleep(5)  # Wait before retrying the connection
+
+            # Attempt to reconnect and resume subscribing
+            while True:
+                try:
+                    with pynng.Mqtt_quic(address) as mqtt:
+                        logging.info("Reconnecting to: " + address + " with topic: " + topic)
+                        connmsg = build_conn_message(mqtt_secrets)
+                        await mqtt.asend_msg(connmsg)
+
+                        # Re-subscribe to the topic
+                        submsg = build_sub_message(topic, mqtt_qos)
+                        await mqtt.asend_msg(submsg)
+                        logging.info(f"Re-subscribed to topic: {topic}")
+
+                        break  # Exit the reconnection loop if successful
+
+                except pynng.exceptions.NNGException:
+                    logging.error("Reconnection failed. Retrying...")
+                    await asyncio.sleep(5)  # Wait before retrying the reconnection
 
 if __name__ == "__main__":
-  logging.info("Starting Version 1.0.5")
-  try:
-    asyncio.run(main())
-  except pynng.exceptions.NNGException:
-    logging.info("Connection closed")
-  except KeyboardInterrupt:   # that's the way the program *should* end
-    exit(0)
-  
+    logging.info("Starting Version 1.0.5")
+    try:
+        asyncio.run(main())
+    except pynng.exceptions.NNGException:
+        logging.info("Connection closed")
+    except KeyboardInterrupt:
+        exit(0)
